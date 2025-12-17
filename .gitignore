@@ -1,0 +1,57 @@
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+
+# Virtual Environments
+.venv/
+venv/
+env/
+ENV/
+
+
+# OS / Editor Noise
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+
+# Data (ML datasets & outputs)
+data/
+*.zip
+*.tar
+*.gz
+
+
+# Model Artifacts
+*.h5
+*.keras
+*.ckpt
+checkpoints/
+models/
+
+
+# Vector Databases / Indexes
+*.db
+*.sqlite
+*.chromadb/
+
+
+# Logs & Reports
+logs/
+*.log
+*.csv
+
+
+# Notebooks & Experiment Files
+.ipynb_checkpoints/
+*.ipynb
+
+
+# Temporary / Scratch
+tmp/
+scratch/
