@@ -19,8 +19,6 @@ def run_archivist():
         if image_path.suffix.lower() not in [".png", ".jpg", ".jpeg"]:
             continue
 
-        print(f"Analyzing: {image_path.name}")
-
         img = preprocess_for_interface(image_path)
         predictions = model.predict(img, verbose=0)
 
@@ -29,5 +27,8 @@ def run_archivist():
 
         move_to_sorted(image_path, category, SORTED_DIR)
 
-        print(f" -> Archived as [{category}]")
-        print("Dungeon Restored")
+def main():
+    run_archivist()
+
+if __name__ == "__main__":
+    main()

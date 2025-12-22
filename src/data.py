@@ -7,7 +7,7 @@ IMG_SIZE = (32, 32)
 def load_and_preprocess_image(image_path):
 
     # Load a PNG image and convert it to a normalized tensor.
-    image = tf.io.read_file(image_path)
+    image = tf.io.read_file(str(image_path))
     image = tf.image.decode_png(image, channels=3)
     image = tf.image.resize(image, IMG_SIZE)
     image = tf.cast(image, tf.float32) / 255.0
