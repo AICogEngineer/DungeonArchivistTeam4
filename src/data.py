@@ -5,6 +5,7 @@ import tensorflow as tf
 IMG_SIZE = (32, 32)
 
 def load_and_preprocess_image(image_path):
+
     # Load a PNG image and convert it to a normalized tensor.
     image = tf.io.read_file(image_path)
     image = tf.image.decode_png(image, channels=3)
@@ -13,8 +14,8 @@ def load_and_preprocess_image(image_path):
     return image
 
 def load_dataset(root_dir):
-    # finds dataset directory and returns X, y and label_map
 
+    # finds dataset directory and returns X, y and label_map
     X = []
     y = []
 
@@ -45,3 +46,9 @@ def load_dataset(root_dir):
 
     return X, y, label_map
 
+def preprocess_for_interface(image_path):
+    # Loads a single image and adds batch dimentions for prediction
+
+    image = load_and_preprocess_image(image_path)
+    image = tf.expand_dims(image, axis=0) # Shape (1, 32, 32, 3)
+    return image
