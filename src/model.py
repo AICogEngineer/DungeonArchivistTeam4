@@ -12,7 +12,7 @@ def build_model(num_classes):
         layers.MaxPooling2D(),
         
         layers.Flatten(),
-        layers.Dense(64, activation='relu'),
+        layers.Dense(64, activation='relu', name='embedding'),
         layers.Dense(num_classes, activation='softmax')
     ])
 

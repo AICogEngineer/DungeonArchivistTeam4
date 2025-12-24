@@ -8,4 +8,4 @@ def move_to_sorted(image_path, category, sorted_root):
     destination_dir.mkdir(parents=True, exist_ok=True)
 
     destination_path = destination_dir / image_path.name
-    shutil.move(str(image_path), str(destination_path))
+    shutil.copy2(str(image_path), str(destination_path))

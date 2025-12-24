@@ -5,6 +5,7 @@ from tensorflow import keras
 from keras import layers
 from pathlib import Path
 import os
+import chromadb
 
 from src.data import load_dataset
 from src.model import build_model
@@ -17,7 +18,7 @@ DATASET_PATH = "./data/raw/Dungeon Crawl Stone Soup Full"
 BATCH_SIZE = 32
 EPOCHS = 5
 VALIDATION_SPLIT = 0.2
-
+EMBEDDING_DIM = 64
 
 # Main python function
 def main():
@@ -52,6 +53,37 @@ def main():
     print("Saving model...")
     os.makedirs("models", exist_ok=True)
     model.save("models/version_model.keras")
+
+    # Create Chroma collection of embedded vectors
+    client = chromadb.PersistentClient(
+        path = "./models/vector_db"
+    )
+
+    collection = client.get_or_create_collection(
+        name = "dataset-A-embeddings",
+        # metadata={"metric": "cosine"}
+    )
+
+    embedding_layer = model.get_layer("embedding")
+
+
+    # Forward pass up to embedding layer
+    embeddings = embedding_layer(
+        tf.convert_to_tensor(X, dtype=tf.float32)
+    ).numpy()
+
+    inverse_label_map = {v: k for k, v in label_map.items()}
+
+    ids = [f"img_{i}" for i in range(len(embeddings))]
+    metadatas = [{"label": inverse_label_map[y[i]]} for i in range(len(y))]
+
+    collection.add(
+        ids=ids,
+        embeddings=embeddings.tolist(),
+        metadatas=metadatas
+    )
+
+    print(f"Stored {len(embeddings)} embeddings in ChromaDB")
     
     print("Training Complete")
 
