@@ -32,6 +32,7 @@ def load_dataset(root_dir):
     for label_name, label_idx in label_map.items():
         label_dir = os.path.join(root_dir, label_name)
         
+<<<<<<< HEAD
         # Go over every file found in the various subfolders
         for root, _, files in os.walk(label_dir):
             for file in files:
@@ -43,6 +44,18 @@ def load_dataset(root_dir):
                         y.append(label_idx)
                     except Exception as e:
                         print(f"Skipping {image_path}: {e}")
+=======
+        for file in os.listdir(label_dir):
+            image_path = os.path.join(label_dir, file)
+
+            if file.lower().endswith(".png") and os.path.isfile(image_path):
+                try:
+                    image = load_and_preprocess_image(image_path)
+                    X.append(image)
+                    y.append(label_idx)
+                except Exception as e:
+                    print(f"Skipping {image_path}: {e}")
+>>>>>>> dc26466 (added early stopping)
     
     X = np.array(X)
     y = np.array(y)

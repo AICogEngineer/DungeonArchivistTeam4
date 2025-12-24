@@ -21,6 +21,13 @@ EPOCHS = 5
 VALIDATION_SPLIT = 0.2
 EMBEDDING_DIM = 64
 
+# Training callbacks
+early_stop = tf.keras.callbacks.EarlyStopping(
+    monitor="val_loss",
+    patience=2,
+    restore_best_weights=True
+)
+
 # Main python function
 def main():
 
@@ -47,7 +54,8 @@ def main():
         batch_size=BATCH_SIZE,
         epochs=EPOCHS,
         validation_split=VALIDATION_SPLIT,
-        shuffle=True
+        shuffle=True,
+        callbacks=[early_stop]
     )
 
     # Save model
