@@ -24,12 +24,15 @@ def load_dataset(root_dir):
         d for d in os.listdir(root_dir)
         if os.path.isdir(os.path.join(root_dir, d))
     ])
+    print(label_names)
 
     label_map = {name: idx for idx, name in enumerate(label_names)}
 
+    # Iterate over the initial top-level folders directly in the data set
     for label_name, label_idx in label_map.items():
         label_dir = os.path.join(root_dir, label_name)
         
+        # Go over every file found in the various subfolders
         for root, _, files in os.walk(label_dir):
             for file in files:
                 if file.lower().endswith(".png"):

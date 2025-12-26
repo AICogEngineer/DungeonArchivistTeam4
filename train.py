@@ -6,6 +6,7 @@ from keras import layers
 from pathlib import Path
 import os
 import chromadb
+import math
 
 from src.data import load_dataset
 from src.model import build_model
@@ -37,7 +38,7 @@ def main():
     # Build model
     print("Building model...")
     model = build_model(num_classes=len(label_map))
-    model.summary()
+
 
     # Train model 
     print("Training model...")
@@ -59,29 +60,50 @@ def main():
         path = "./models/vector_db"
     )
 
+    collection_name = "dataset-A-embeddings"
+    # Delete existing collection if it exists (for clean demo)
+    try:
+        client.delete_collection(collection_name)
+    except:
+        pass
     collection = client.get_or_create_collection(
-        name = "dataset-A-embeddings",
+        name = collection_name,
         # metadata={"metric": "cosine"}
     )
 
     embedding_layer = model.get_layer("embedding")
-
+    embedding_model = tf.keras.Model(
+        inputs=model.input,
+        outputs=embedding_layer.output
+    )
 
     # Forward pass up to embedding layer
-    embeddings = embedding_layer(
-        tf.convert_to_tensor(X, dtype=tf.float32)
-    ).numpy()
+    # TODO batch?
+    embeddings = embedding_model(X).numpy()
 
     inverse_label_map = {v: k for k, v in label_map.items()}
 
     ids = [f"img_{i}" for i in range(len(embeddings))]
     metadatas = [{"label": inverse_label_map[y[i]]} for i in range(len(y))]
 
-    collection.add(
-        ids=ids,
-        embeddings=embeddings.tolist(),
-        metadatas=metadatas
-    )
+    # Generate embeddings in batches
+    EMBEDDING_BATCH_SIZE = 512 
+    num_samples = len(embeddings)
+    num_batches = math.ceil(num_samples / EMBEDDING_BATCH_SIZE)
+
+    for i in range(num_batches):
+        start = i * EMBEDDING_BATCH_SIZE
+        end = min((i+1) * EMBEDDING_BATCH_SIZE, num_samples)
+
+        batch_ids = ids[start:end]
+        batch_embeddings = embeddings[start:end].tolist()
+        batch_metadatas = metadatas[start:end]
+
+        collection.add(
+            ids=batch_ids,
+            embeddings=batch_embeddings,
+            metadatas=batch_metadatas
+        )
 
     print(f"Stored {len(embeddings)} embeddings in ChromaDB")
     
