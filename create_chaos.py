@@ -8,9 +8,11 @@ import os
 import random
 import shutil
 
+from io_ops import clear_directories, clear_or_create_folder
+
 source_folder = "./data/raw/Dungeon Crawl Stone Soup Full"
 target_folder = "./data/chaos"
-num_images = 1000
+num_images = 100
 allowed_extensions = {'.jpg', '.jpeg', '.png'}
 
 def generate_hex_name(used_names):
@@ -22,11 +24,7 @@ def generate_hex_name(used_names):
 
 def main():
     # Delete existing target folder if it exists
-    if os.path.exists(target_folder):
-        shutil.rmtree(target_folder)
-        print(f"Deleted existing folder: {target_folder}")
-
-    os.makedirs(target_folder, exist_ok=True)
+    clear_or_create_folder(target_folder)
 
     # Recursively gather all image file paths
     all_images = []
