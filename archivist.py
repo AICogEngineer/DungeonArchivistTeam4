@@ -13,7 +13,7 @@ from src.io_ops import clear_or_create_folder
 
 # Paths 
 MODEL_PATH = Path("models/version_model.keras")
-CHAOS_DIR = Path("data/chaos")
+CHAOS_DIR = Path("data/chaos_data")
 SORTED_DIR = Path("data/restored_archive")
 REVIEW_DIR = Path("data/review_pile")
 
