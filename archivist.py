@@ -8,12 +8,11 @@ import shutil
 
 
 from src.data import preprocess_for_interface
-from src.labeling import LABEL_MAP
 from src.io_ops import clear_or_create_folder
 
 # Paths 
 MODEL_PATH = Path("models/version_model.keras")
-CHAOS_DIR = Path("data/chaos_data")
+CHAOS_DIR = Path("data/chaos")
 SORTED_DIR = Path("data/restored_archive")
 REVIEW_DIR = Path("data/review_pile")
 
@@ -44,10 +43,14 @@ def run_archivist():
     )
 
     # Load vector db
-    client = chromadb.PersistentClient(
-        path="./models/vector_db"
-    )
+    client = chromadb.PersistentClient(path="./models/vector_db")
+    
+    collections = client.list_collections()
+    print("Avaible collections:", collections)
+
+    
     collection = client.get_collection("dataset-A-embeddings")
+    print("Vector DB count:", collection.count())
 
     for root, dirs, files in os.walk(CHAOS_DIR):
         for filename in files:
