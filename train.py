@@ -28,6 +28,12 @@ early_stop = tf.keras.callbacks.EarlyStopping(
     restore_best_weights=True
 )
 
+log_dir = "logs/tensorboard"
+tensorboard_cb = tf.keras.callbacks.TensorBoard(
+    log_dir=log_dir,
+    histogram_freq=1
+)
+
 # Main python function
 def main():
 
@@ -55,7 +61,7 @@ def main():
         epochs=EPOCHS,
         validation_split=VALIDATION_SPLIT,
         shuffle=True,
-        callbacks=[early_stop]
+        callbacks=[early_stop, tensorboard_cb]
     )
 
     # Save model
