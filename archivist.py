@@ -17,11 +17,11 @@ SORTED_DIR = Path("data/restored_archive")
 REVIEW_DIR = Path("data/review_pile")
 
 TOP_K = 5
-CONFIDENCE_THRESHOLD = 0.7
+CONFIDENCE_THRESHOLD = 0.75
 
 def weighted_vote(neighbors):
     labels = [m['label'] for m in neighbors]
-    counts = {l: labels.count(l) for l in set(labels)}
+    counts = {l: labels.count(l) for l in set(labels)} 
     best_label = max(counts, key=counts.get)
     confidence = counts[best_label] / len(labels)
     return best_label, confidence

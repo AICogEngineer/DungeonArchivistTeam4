@@ -17,7 +17,7 @@ DATASET_PATH = "./data/raw/Dungeon Crawl Stone Soup Full"
 
 # Training parameters (CPU-safe)
 BATCH_SIZE = 32
-EPOCHS = 5
+EPOCHS = 10
 VALIDATION_SPLIT = 0.2
 EMBEDDING_DIM = 64
 

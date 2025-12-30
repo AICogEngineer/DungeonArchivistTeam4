@@ -16,7 +16,7 @@ def build_model(num_classes):
 
     x = layers.Flatten()(x)
     embedding = layers.Dense(64, activation='relu', name='embedding')(x)
-    x = layers.Dropout(0.4)(embedding)
+    x = layers.Dropout(0.3)(embedding)
     outputs = layers.Dense(num_classes, activation='softmax')(x)
 
     model = models.Model(inputs, outputs)
