@@ -17,13 +17,25 @@ SORTED_DIR = Path("data/restored_archive")
 REVIEW_DIR = Path("data/review_pile")
 
 TOP_K = 5
-CONFIDENCE_THRESHOLD = 0.75
+CONFIDENCE_THRESHOLD = 0.7
+DEBUG_OUTPUT = True  # Set False for normal operation
 
 def weighted_vote(neighbors):
     labels = [m['label'] for m in neighbors]
     counts = {l: labels.count(l) for l in set(labels)} 
     best_label = max(counts, key=counts.get)
     confidence = counts[best_label] / len(labels)
+    return best_label, confidence
+
+def weighted_vote_distance(neighbors, similarities):
+    votes = {}
+    for neighbor, sim in zip(neighbors, similarities):
+        label = neighbor['label']
+        votes[label] = votes.get(label, 0) + sim  # weight by similarity
+    
+    # Pick label with highest weighted vote
+    best_label = max(votes, key=votes.get)
+    confidence = votes[best_label] / sum(votes.values())
     return best_label, confidence
 
 def run_archivist():
@@ -52,6 +64,7 @@ def run_archivist():
     collection = client.get_collection("dataset-A-embeddings")
     print("Vector DB count:", collection.count())
 
+    i = 0   # Debug first 10 images
     for root, dirs, files in os.walk(CHAOS_DIR):
         for filename in files:
             if not filename.lower().endswith((".png", ".jpg", ".jpeg")):
@@ -64,29 +77,30 @@ def run_archivist():
                     n_results=TOP_K
                 )
             neighbors = results['metadatas'][0]
-            label, confidence = weighted_vote(neighbors)
+            similarities = results['distances'][0]  # Chroma usually gives distances
+            # If distances, convert to similarity:
+            similarities = [1 - d for d in similarities]  # cosine similarity: 1 - distance
+            label, confidence = weighted_vote_distance(neighbors, similarities)
 
-            if confidence >= CONFIDENCE_THRESHOLD:
+            if confidence >= CONFIDENCE_THRESHOLD:    
+                # best_match_path = neighbors[0]["rel_path"]    # use rel_path if you think you can get more specific
+                # best_match_path = label
+                # dest_dir = os.path.join(SORTED_DIR, os.path.dirname(best_match_path))
                 dest_dir = os.path.join(SORTED_DIR, label)
             else:
                 dest_dir = REVIEW_DIR
             if not os.path.exists(dest_dir):
                 os.makedirs(dest_dir)
             shutil.copy2(image_path, os.path.join(dest_dir, filename))
-            print(f"{filename} -> {dest_dir} (confidence: {confidence:.2f})")
+            
+            # Debug output
+            if DEBUG_OUTPUT and (i < 10):
+                print(f"{filename} -> {dest_dir} (confidence: {confidence:.2f})")
+                print("  Top neighbors:")
+                for n, s in zip(neighbors, similarities):
+                    print(f"    {n['label']} (sim={s:.2f})")
+            i += 1
 
-
-    # for image_path in CHAOS_DIR.iterdir():
-    #     if image_path.suffix.lower() not in [".png", ".jpg", ".jpeg"]:
-    #         continue
-
-    #     img = preprocess_for_interface(image_path)
-    #     predictions = trained_model.predict(img, verbose=0)
-
-    #     predicted_index = np.argmax(predictions)
-    #     category = LABEL_MAP [predicted_index]
-
-    #     move_to_sorted(image_path, category, SORTED_DIR)
 
 def main():
     run_archivist()

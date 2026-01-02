@@ -1,16 +1,12 @@
-import numpy as np
-import matplotlib.pyplot as plt
 import tensorflow as tf
-from tensorflow import keras
-from keras import layers
-from pathlib import Path
 import os
 import chromadb
 import math
-
+import numpy as np
 from src.data import load_dataset
 from src.model import build_model
 
+from sklearn.model_selection import train_test_split
 
 # Path to dataset (clean labeled data)
 DATASET_PATH = "./data/raw/Dungeon Crawl Stone Soup Full"
@@ -41,7 +37,21 @@ def main():
 
     # Load data/images
     print("Loading dataset...")
-    X, y, label_map = load_dataset(DATASET_PATH)
+    X, y, label_map, paths = load_dataset(DATASET_PATH)
+
+    # Split data set
+    print("Splitting dataset into training and validation...")
+    X_train, X_val, y_train, y_val = train_test_split(
+        X, y, test_size=VALIDATION_SPLIT, stratify=y, random_state=42
+    )
+    print(f"Training samples: {X_train.shape[0]}, Validation samples: {X_val.shape[0]}")
+
+    print("Training labels range:", np.unique(y_train))
+    print("Validation labels range:", np.unique(y_val))
+    print("X_train shape:", X_train.shape)
+    print("X_val shape:", X_val.shape)
+    print("y_train shape:", y_train.shape)
+    print("y_val shape:", y_val.shape)
 
     print(f"Loaded {X.shape[0]} images")
     print(f"Image shape: {X.shape[1:]}")
@@ -56,10 +66,10 @@ def main():
     # Train model 
     print("Training model...")
     history = model.fit(
-        X, y, 
+        X_train, y_train,   
         batch_size=BATCH_SIZE,
         epochs=EPOCHS,
-        validation_split=VALIDATION_SPLIT,
+        validation_data=(X_val, y_val),
         shuffle=True,
         callbacks=[early_stop, tensorboard_cb]
     )
@@ -82,7 +92,7 @@ def main():
         pass
     collection = client.get_or_create_collection(
         name = collection_name,
-        # metadata={"metric": "cosine"}
+        metadata={"metric": "cosine"}   # Cosine is the default
     )
 
     embedding_layer = model.get_layer("embedding")
@@ -91,16 +101,25 @@ def main():
         outputs=embedding_layer.output
     )
 
-    # Forward pass up to embedding layer
+    # Forward pass up to embedding layer, generating embeddings
     # TODO batch?
     embeddings = embedding_model(X).numpy()
 
-    inverse_label_map = {v: k for k, v in label_map.items()}
+    # embeddings = embedding_model.predict(X, batch_size=EMBEDDING_BATCH_SIZE)
 
+    class_id_to_label = {v: k for k, v in label_map.items()}
+
+    # Get list of ids and metadatas
     ids = [f"img_{i}" for i in range(len(embeddings))]
-    metadatas = [{"label": inverse_label_map[y[i]]} for i in range(len(y))]
+    metadatas = [
+        {
+            "label": class_id_to_label[y[i]],
+            "rel_path": paths[i]
+        }
+        for i in range(len(y))
+    ]
 
-    # Generate embeddings in batches
+    # Save embeddings in batches
     EMBEDDING_BATCH_SIZE = 512 
     num_samples = len(embeddings)
     num_batches = math.ceil(num_samples / EMBEDDING_BATCH_SIZE)

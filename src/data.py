@@ -18,6 +18,7 @@ def load_dataset(root_dir):
     # finds dataset directory and returns X, y and label_map
     X = []
     y = []
+    paths = []  # Store paths so subfolder structure is preserved in metadata
 
     # Top-level folders = labels
     label_names = sorted([
@@ -41,13 +42,15 @@ def load_dataset(root_dir):
                         image = load_and_preprocess_image(image_path)
                         X.append(image)
                         y.append(label_idx)
+                        rel_path = os.path.relpath(image_path, root_dir)
+                        paths.append(rel_path)
                     except Exception as e:
                         print(f"Skipping {image_path}: {e}")
     
     X = np.array(X)
     y = np.array(y)
 
-    return X, y, label_map
+    return X, y, label_map, paths
 
 def preprocess_for_interface(image_path):
     # Loads a single image and adds batch dimentions for prediction
