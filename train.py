@@ -1,12 +1,14 @@
 import tensorflow as tf
-import os
 import chromadb
+import json
+import os
 import math
 import numpy as np
+from sklearn.model_selection import train_test_split
+
 from src.data import load_dataset
 from src.model import build_model
 
-from sklearn.model_selection import train_test_split
 
 # Path to dataset (clean labeled data)
 DATASET_PATH = "./data/raw/Dungeon Crawl Stone Soup Full"
@@ -30,6 +32,7 @@ tensorboard_cb = tf.keras.callbacks.TensorBoard(
     histogram_freq=1
 )
 
+
 # Main python function
 def main():
 
@@ -42,8 +45,12 @@ def main():
     # Split data set
     print("Splitting dataset into training and validation...")
     X_train, X_val, y_train, y_val = train_test_split(
-        X, y, test_size=VALIDATION_SPLIT, stratify=y, random_state=42
+        X, y, 
+        test_size=VALIDATION_SPLIT,
+        stratify=y,
+        random_state=42
     )
+
     print(f"Training samples: {X_train.shape[0]}, Validation samples: {X_val.shape[0]}")
 
     print("Training labels range:", np.unique(y_train))
@@ -62,7 +69,6 @@ def main():
     print("Building model...")
     model = build_model(num_classes=len(label_map))
 
-
     # Train model 
     print("Training model...")
     history = model.fit(
@@ -74,17 +80,30 @@ def main():
         callbacks=[early_stop, tensorboard_cb]
     )
 
+    os.makedirs("analysis", exist_ok=True)
+    with open("analysis/training_history.json", "w") as f:
+        json.dump(history.history, f)
+    
+    print("Saved training history to analysis/training_history.json")
+
     # Save model
     print("Saving model...")
     os.makedirs("models", exist_ok=True)
     model.save("models/version_model.keras")
 
-    # Create Chroma collection of embedded vectors
-    client = chromadb.PersistentClient(
-        path = "./models/vector_db"
+    # Build embedding model
+    print("Generating embeddings...")
+    embedding_model = tf.keras.Model(
+        inputs=model.input,
+        outputs=model.get_layer("embedding").output
     )
+    embeddings = embedding_model.predict(X, batch_size=64)
+    print("Embeddings shape:", embeddings.shape)
 
+    # Create Chroma collection of embedded vectors
+    client = chromadb.PersistentClient(path = "./models/vector_db")
     collection_name = "dataset-A-embeddings"
+
     # Delete existing collection if it exists (for clean demo)
     try:
         client.delete_collection(collection_name)
@@ -95,18 +114,7 @@ def main():
         metadata={"metric": "cosine"}   # Cosine is the default
     )
 
-    embedding_layer = model.get_layer("embedding")
-    embedding_model = tf.keras.Model(
-        inputs=model.input,
-        outputs=embedding_layer.output
-    )
-
-    # Forward pass up to embedding layer, generating embeddings
-    # TODO batch?
-    embeddings = embedding_model(X).numpy()
-
-    # embeddings = embedding_model.predict(X, batch_size=EMBEDDING_BATCH_SIZE)
-
+    # Prepare metadata
     class_id_to_label = {v: k for k, v in label_map.items()}
 
     # Get list of ids and metadatas
@@ -139,7 +147,6 @@ def main():
         )
 
     print(f"Stored {len(embeddings)} embeddings in ChromaDB")
-    
     print("Training Complete")
 
 if __name__ == "__main__":

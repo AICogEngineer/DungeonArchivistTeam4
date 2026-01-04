@@ -13,7 +13,7 @@ def data_augmentation():
 
 def build_model(num_classes):
     inputs = layers.Input(shape=(32, 32, 3))
-    inputs = data_augmentation()(inputs) # Create more training data from data augmentation
+    x = data_augmentation()(inputs) # Create more training data from data augmentation
 
     x = layers.Conv2D(32, 3, padding='same', activation='relu')(inputs)
     x = layers.BatchNormalization()(x)

@@ -1,11 +1,12 @@
 from pathlib import Path
+from datetime import datetime
 import numpy as np
 from tensorflow import keras 
 from keras import models
 import chromadb
-import os
 import shutil
-
+import csv
+import os
 
 from src.data import preprocess_for_interface
 from src.io_ops import clear_or_create_folder
@@ -44,6 +45,24 @@ def run_archivist():
     clear_or_create_folder(str(SORTED_DIR))    
     clear_or_create_folder(str(REVIEW_DIR))
     print("Loading trained Dungeon Archivist...")
+
+    # Analysis output seteup
+    os.makedirs("analysis", exist_ok=True)
+
+    run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
+    results_path = f"analysis/run_results_{run_id}.csv"
+
+    results_file = open("analysis/run_results.csv", "w", newline="")
+    writer = csv.writer(results_file)
+    writer.writerow([
+        "filename",
+        "predicted_label",
+        "confidence",
+        "destination",
+        "top_k_labels",
+        "top_k_similarities"
+    ])
+
     # Load trained model
     trained_model = keras.models.load_model(MODEL_PATH)
 
@@ -64,6 +83,12 @@ def run_archivist():
     collection = client.get_collection("dataset-A-embeddings")
     print("Vector DB count:", collection.count())
 
+    if collection.count() == 0:
+        results_file.close()
+        raise RuntimeError(
+            "Vector DB is empty. Run train.py before running archivist.py."
+        )
+
     i = 0   # Debug first 10 images
     for root, dirs, files in os.walk(CHAOS_DIR):
         for filename in files:
@@ -78,9 +103,28 @@ def run_archivist():
                 )
             neighbors = results['metadatas'][0]
             similarities = results['distances'][0]  # Chroma usually gives distances
-            # If distances, convert to similarity:
-            similarities = [1 - d for d in similarities]  # cosine similarity: 1 - distance
+            # Chroma returns cosine distance:
+            #   0.0 = identical vectors
+            #   1.0 = maximally different
+            # Convert to similarity so higher = more similar
+            similarities = [1.0 - d for d in similarities]  # cosine similarity: 1 - distance
             label, confidence = weighted_vote_distance(neighbors, similarities)
+
+            destination = ( 
+                "restored_archive"
+                if confidence >= CONFIDENCE_THRESHOLD
+                else "review_pile"
+            )
+
+            writer.writerow([
+                filename, 
+                label,
+                round(confidence, 4),
+                destination,
+                [n["label"] for n in neighbors],
+                [round(s, 4) for s in similarities]
+
+            ])
 
             if confidence >= CONFIDENCE_THRESHOLD:    
                 # best_match_path = neighbors[0]["rel_path"]    # use rel_path if you think you can get more specific
@@ -101,6 +145,8 @@ def run_archivist():
                     print(f"    {n['label']} (sim={s:.2f})")
             i += 1
 
+    results_file.close()
+    print("Analysis results saved to analysis/run_results.csv")
 
 def main():
     run_archivist()
