@@ -1,37 +1,51 @@
 from tensorflow import keras 
 from keras import layers, models
 
-def data_augmentation():
-    return models.Sequential([
-        layers.RandomFlip("horizontal"),             # horizontal flip
-        layers.RandomRotation(0.2),                 # ±20% rotation
-        layers.RandomZoom(0.1),                     # ±10% zoom
-        layers.RandomTranslation(0.1, 0.1),         # ±10% shift
-        layers.RandomContrast(0.1),                 # slight contrast change
-        layers.RandomBrightness(0.1)                # slight brightness change
-    ])
+RGB_CHANNELS = 3
+IMG_SIZE = (32, 32)
 
 def build_model(num_classes):
-    inputs = layers.Input(shape=(32, 32, 3))
-    inputs = data_augmentation()(inputs) # Create more training data from data augmentation
+    inputs = layers.Input(shape=(*IMG_SIZE, RGB_CHANNELS))
+    
+    # Block 1
+    x = layers.Conv2D(48, 3, padding='same', use_bias=False)(inputs)
+    x = layers.BatchNormalization()(x)
+    x = layers.ReLU()(x)
 
-    x = layers.Conv2D(32, 3, padding='same', activation='relu')(inputs)
+    x = layers.Conv2D(48, 3, padding='same', use_bias=False)(x)
     x = layers.BatchNormalization()(x)
-    x = layers.Conv2D(32, 3, padding='same', activation='relu')(x)
-    x = layers.BatchNormalization()(x)
+    x = layers.ReLU()(x)
+
     x = layers.MaxPooling2D()(x)
     x = layers.Dropout(0.2)(x)
 
-    x = layers.Conv2D(64, 3, padding='same', activation='relu')(x)
+    # Block 2
+    x = layers.Conv2D(64, 3, padding='same', use_bias=False)(x)
     x = layers.BatchNormalization()(x)
-    x = layers.Conv2D(64, 3, padding='same', activation='relu')(x)
+    x = layers.ReLU()(x)
+
+    x = layers.Conv2D(64, 3, padding='same', use_bias=False)(x)
     x = layers.BatchNormalization()(x)
+    x = layers.ReLU()(x)
+
+    x = layers.MaxPooling2D()(x)
+    x = layers.Dropout(0.25)(x)
+
+    # Block 3
+    x = layers.Conv2D(96, 3, padding='same', use_bias=False)(x)
+    x = layers.BatchNormalization()(x)
+    x = layers.ReLU()(x)
     x = layers.MaxPooling2D()(x)
     x = layers.Dropout(0.3)(x)
 
+    # Head
     x = layers.GlobalAveragePooling2D()(x)
-    embedding = layers.Dense(128, activation='relu', name='embedding')(x)
-    x = layers.Dropout(0.4)(embedding)
+    x = layers.Dense(128, use_bias=False, name='embedding')(x)  # smaller embedding
+    x = layers.BatchNormalization()(x)
+    x = layers.ReLU()(x)
+    x = layers.Dropout(0.35)(x)
+
+    # Classifier
     outputs = layers.Dense(num_classes, activation='softmax')(x)
 
     model = models.Model(inputs, outputs)
