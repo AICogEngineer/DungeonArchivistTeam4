@@ -7,6 +7,7 @@ import numpy as np
 from keras import layers, models
 from archivist import run_archivist_on_b
 from sklearn.model_selection import train_test_split
+from datetime import datetime
 
 from src.data import load_dataset
 from src.model import build_model
@@ -30,6 +31,16 @@ EMBEDDING_BATCH_SIZE = 512
 
 RUN_BOTH = True        # If True, runs training on both Dataset A and combined A+B
 
+
+def make_tensorboard_callback(run_name):
+    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    log_dir = os.path.join("logs", "tensorboard", run_name, timestamp)
+
+    return tf.keras.callbacks.TensorBoard(
+        log_dir=log_dir,
+        histogram_freq=1
+    )
+
 # Training callbacks
 early_stop = tf.keras.callbacks.EarlyStopping(
     monitor="val_loss",
@@ -38,11 +49,6 @@ early_stop = tf.keras.callbacks.EarlyStopping(
     restore_best_weights=True
 )
 
-log_dir = "logs/tensorboard"
-tensorboard_cb = tf.keras.callbacks.TensorBoard(
-    log_dir=log_dir,
-    histogram_freq=1
-)
 
 def batch_iterable(iterable, batch_size):
     """Yield successive batches from an iterable."""
@@ -62,6 +68,8 @@ def train_on_dataset(X, y, label_map, collection_name):
     )
 
     print(f"Training samples: {X_train.shape[0]}, Validation samples: {X_val.shape[0]}")
+
+    tensorboard_cb = make_tensorboard_callback(collection_name)
 
     # Build and train model
     model = build_model(num_classes=len(label_map))

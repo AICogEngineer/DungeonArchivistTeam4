@@ -40,7 +40,7 @@ def build_model(num_classes):
 
     # Head
     x = layers.GlobalAveragePooling2D()(x)
-    x = layers.Dense(128, use_bias=False, name='embedding')(x)  # smaller embedding
+    x = layers.Dense(128, use_bias=False, name='embedding')(x)
     x = layers.BatchNormalization()(x)
     x = layers.ReLU()(x)
     x = layers.Dropout(0.35)(x)

@@ -94,6 +94,21 @@ This mirrors real-world ML workflows where test data is reserved strictly for in
 
 ---
 
+## Accuracy & Loss Comparison
+### Before (Only Dataset A)
+
+| <img src="../analysis/accuracy_dataset_a.png" style="max-height:400px;" /> | <img src="../analysis/loss_dataset_a.png" style="max-height:400px;" /> |
+|----------------------------------------------------------------------------|
+
+
+### After (Dataset A + sorted Dataset B)
+
+| <img src="../analysis/accuracy_dataset_ab.png" style="max-height:400px;" /> | <img src="../analysis/loss_dataset_ab.png" style="max-height:400px;" /> |
+|-----------------------------------------------------------------------------|
+
+
+---
+
 ## Conclusion
 
 The Dungeon Archivist successfully demonstrates how supervised learning and vector similarity search can be combined to restore structure to disorganized data. By separating classification from retrieval through an embedding-based design, the system generalizes beyond the initial labeled dataset.
