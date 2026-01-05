@@ -1,14 +1,16 @@
 import tensorflow as tf
-import os
 import chromadb
+import json
+import os
 import math
 import numpy as np
 from keras import layers, models
 from archivist import run_archivist_on_b
+from sklearn.model_selection import train_test_split
+
 from src.data import load_dataset
 from src.model import build_model
 
-from sklearn.model_selection import train_test_split
 
 # Path to dataset (clean labeled data)
 DATASET_PATH = "./data/raw/Dungeon Crawl Stone Soup Full"
@@ -52,12 +54,17 @@ def train_on_dataset(X, y, label_map, collection_name):
 
     # Split dataset
     X_train, X_val, y_train, y_val = train_test_split(
-        X, y, test_size=VALIDATION_SPLIT, stratify=y, random_state=42
+        X, y, 
+        test_size=VALIDATION_SPLIT,
+        stratify=y,
+        random_state=42
     )
+
+    print(f"Training samples: {X_train.shape[0]}, Validation samples: {X_val.shape[0]}")
 
     # Build and train model
     model = build_model(num_classes=len(label_map))
-    model.fit(
+    history = model.fit(
         X_train, y_train,
         validation_data=(X_val, y_val),
         batch_size=BATCH_SIZE,
@@ -66,15 +73,26 @@ def train_on_dataset(X, y, label_map, collection_name):
         callbacks=[early_stop, tensorboard_cb]
     )
 
+    os.makedirs("analysis", exist_ok=True)
+    with open("analysis/training_history.json", "w") as f:
+        json.dump(history.history, f)
+    
+    print("Saved training history to analysis/training_history.json")
+
+    # Save model
+    print("Saving model...")
     os.makedirs(MODEL_DIR, exist_ok=True)
     model.save(MODEL_PATH)
     print(f"Model saved to {MODEL_PATH}")
 
-    # Prepare embedding model
+    # Build embedding model
+    print("Generating embeddings...")
     embedding_model = tf.keras.Model(
         inputs=model.input,
         outputs=model.get_layer("embedding").output
     )
+    embeddings = embedding_model.predict(X, batch_size=64)
+    print("Embeddings shape:", embeddings.shape)
 
     # Initialize ChromaDB collection
     client = chromadb.PersistentClient(path=VECTOR_DB_PATH)
@@ -82,8 +100,12 @@ def train_on_dataset(X, y, label_map, collection_name):
         client.delete_collection(collection_name)
     except:
         pass
-    collection = client.get_or_create_collection(name=collection_name)
+    collection = client.get_or_create_collection(
+        name = collection_name,
+        metadata={"metric": "cosine"}   # Cosine is the default
+    )
 
+    # Prepare metadata
     class_id_to_label = {v: k for k, v in label_map.items()}
     num_samples = X.shape[0]
     print(f"Generating embeddings for {num_samples} images in batches of {EMBEDDING_BATCH_SIZE}...")

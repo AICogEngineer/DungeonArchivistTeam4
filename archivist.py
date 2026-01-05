@@ -6,6 +6,15 @@ import numpy as np
 from tensorflow import keras
 from keras import models
 import chromadb
+from datetime import datetime
+import numpy as np
+from tensorflow import keras 
+from keras import models
+import chromadb
+import shutil
+import csv
+import os
+
 from src.data import preprocess_for_interface
 from src.io_ops import clear_or_create_folder
 
@@ -52,6 +61,23 @@ def run_archivist(source_dir, sorted_dir, review_dir, collection_name):
     clear_or_create_folder(review_dir)
 
     print("Loading trained Dungeon Archivist model...")
+    
+    # Analysis output seteup
+    os.makedirs("analysis", exist_ok=True)
+
+    run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
+    results_path = f"analysis/run_results_{run_id}.csv"
+
+    results_file = open("analysis/run_results.csv", "w", newline="")
+    writer = csv.writer(results_file)
+    writer.writerow([
+        "filename",
+        "predicted_label",
+        "confidence",
+        "destination",
+        "top_k_labels",
+        "top_k_similarities"
+    ])
     trained_model = keras.models.load_model(MODEL_PATH)
 
     embedding_model = models.Model(
@@ -71,40 +97,70 @@ def run_archivist(source_dir, sorted_dir, review_dir, collection_name):
         for f in files if f.lower().endswith((".png", ".jpg", ".jpeg"))
     ]
 
-    num_images = len(all_images)
-    print(f"Found {num_images} images to classify in {source_dir}")
+    if collection.count() == 0:
+        results_file.close()
+        raise RuntimeError(
+            "Vector DB is empty. Run train.py before running archivist.py."
+        )
 
-    for batch_idx, batch_files in enumerate(batch_iterable(all_images, BATCH_SIZE)):
-        # Preprocess batch
-        batch_X = np.vstack([preprocess_for_interface(f) for f in batch_files])
-
-        # Compute embeddings
-        batch_embeddings = embedding_model.predict(batch_X, batch_size=BATCH_SIZE, verbose=0)
-
-        for i, (file_path, vector) in enumerate(zip(batch_files, batch_embeddings)):
-            # Query vector DB
+    i = 0   # Debug first 10 images
+    for root, dirs, files in os.walk(CHAOS_DIR):
+        for filename in files:
+            if not filename.lower().endswith((".png", ".jpg", ".jpeg")):
+                continue
+            image_path = os.path.join(root, filename)
+            img = preprocess_for_interface(image_path)
+            vector = embedding_model.predict(img)[0]
             results = collection.query(
                 query_embeddings=[vector.tolist()],
                 n_results=TOP_K
             )
 
             neighbors = results['metadatas'][0]
-            distances = results['distances'][0]
-            similarities = [1 - d for d in distances]  # Convert distance -> similarity
-
+            similarities = results['distances'][0]  # Chroma usually gives distances
+            # Chroma returns cosine distance:
+            #   0.0 = identical vectors
+            #   1.0 = maximally different
+            # Convert to similarity so higher = more similar
+            similarities = [1.0 - d for d in similarities]  # cosine similarity: 1 - distance
             label, confidence = weighted_vote_distance(neighbors, similarities)
 
-            # Determine destination folder
-            dest_dir = os.path.join(sorted_dir, label) if confidence >= CONFIDENCE_THRESHOLD else review_dir
-            os.makedirs(dest_dir, exist_ok=True)
-            shutil.copy2(file_path, os.path.join(dest_dir, os.path.basename(file_path)))
+            destination = ( 
+                sorted_dir
+                if confidence >= CONFIDENCE_THRESHOLD
+                else review_dir
+            )
 
-            # Debug
-            if DEBUG_OUTPUT: # and batch_idx * BATCH_SIZE + i < 10:
-                print(f"{os.path.basename(file_path)} -> {dest_dir} (confidence: {confidence:.2f})")
+            writer.writerow([
+                filename, 
+                label,
+                round(confidence, 4),
+                destination,
+                [n["label"] for n in neighbors],
+                [round(s, 4) for s in similarities]
+
+            ])
+
+            if confidence >= CONFIDENCE_THRESHOLD:    
+                # best_match_path = neighbors[0]["rel_path"]    # use rel_path if you think you can get more specific
+                # best_match_path = label
+                # dest_dir = os.path.join(SORTED_DIR, os.path.dirname(best_match_path))
+                dest_dir = os.path.join(sorted_dir, label)
+            else:
+                dest_dir = review_dir
+            if not os.path.exists(dest_dir):
+                os.makedirs(dest_dir)
+            shutil.copy2(image_path, os.path.join(dest_dir, filename))
+            
+            # Debug output
+            if DEBUG_OUTPUT and (i < 10):
+                print(f"{filename} -> {dest_dir} (confidence: {confidence:.2f})")
+                print("  Top neighbors:")
                 for n, s in zip(neighbors, similarities):
                     print(f"    {n['label']} (sim={s:.2f})")
 
+    results_file.close()
+    print("Analysis results saved to analysis/run_results.csv")
 
 def run_archivist_on_b():
     collection_name = "dataset-A-embeddings"
