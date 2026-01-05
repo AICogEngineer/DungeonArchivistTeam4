@@ -104,18 +104,19 @@ def run_archivist(source_dir, sorted_dir, review_dir, collection_name):
         )
 
     i = 0   # Debug first 10 images
-    for root, dirs, files in os.walk(CHAOS_DIR):
+    for root, dirs, files in os.walk(source_dir):
         for filename in files:
             if not filename.lower().endswith((".png", ".jpg", ".jpeg")):
                 continue
             image_path = os.path.join(root, filename)
             img = preprocess_for_interface(image_path)
-            vector = embedding_model.predict(img)[0]
+            vector = embedding_model.predict(img, verbose=0)[0]
             results = collection.query(
                 query_embeddings=[vector.tolist()],
                 n_results=TOP_K
             )
-
+            if i <= 10:
+                print(results)
             neighbors = results['metadatas'][0]
             similarities = results['distances'][0]  # Chroma usually gives distances
             # Chroma returns cosine distance:
@@ -158,6 +159,7 @@ def run_archivist(source_dir, sorted_dir, review_dir, collection_name):
                 print("  Top neighbors:")
                 for n, s in zip(neighbors, similarities):
                     print(f"    {n['label']} (sim={s:.2f})")
+            i += 1
 
     results_file.close()
     print("Analysis results saved to analysis/run_results.csv")
@@ -172,6 +174,7 @@ def run_archivist_on_c():
 
 def main():
     run_archivist_on_c()
+    # run_archivist_on_b()
 
 if __name__ == "__main__":
     main()

@@ -33,7 +33,8 @@ RUN_BOTH = True        # If True, runs training on both Dataset A and combined A
 # Training callbacks
 early_stop = tf.keras.callbacks.EarlyStopping(
     monitor="val_loss",
-    patience=2,
+    patience=5,
+    min_delta=0.01,
     restore_best_weights=True
 )
 
@@ -74,7 +75,7 @@ def train_on_dataset(X, y, label_map, collection_name):
     )
 
     os.makedirs("analysis", exist_ok=True)
-    with open("analysis/training_history.json", "w") as f:
+    with open(f"analysis/training_history_{collection_name}.json", "w") as f:
         json.dump(history.history, f)
     
     print("Saved training history to analysis/training_history.json")
@@ -102,7 +103,7 @@ def train_on_dataset(X, y, label_map, collection_name):
         pass
     collection = client.get_or_create_collection(
         name = collection_name,
-        metadata={"metric": "cosine"}   # Cosine is the default
+        metadata={"hnsw:space": "cosine"}
     )
 
     # Prepare metadata
@@ -114,6 +115,7 @@ def train_on_dataset(X, y, label_map, collection_name):
     for batch_idx, batch_slice in enumerate(batch_iterable(range(num_samples), EMBEDDING_BATCH_SIZE)):
         batch_X = X[batch_slice]
         batch_embeddings = embedding_model.predict(batch_X, batch_size=EMBEDDING_BATCH_SIZE, verbose=0)
+        batch_embeddings = tf.math.l2_normalize(batch_embeddings, axis=1).numpy()   # Normalize embeddings
 
         # Prepare IDs and metadata
         batch_ids = [f"img_{i}" for i in batch_slice]

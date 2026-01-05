@@ -2,7 +2,8 @@ import json
 import matplotlib.pyplot as plt
 import os
 
-HISTORY_PATH = "analysis/training_history.json"
+HISTORY_PATH = "analysis/training_history_dataset-A-embeddings.json"
+# HISTORY_PATH_2 = "analysis/training_history_dataset-AB-embeddings.json"
 
 if not os.path.exists(HISTORY_PATH):
     raise FileNotFoundError(

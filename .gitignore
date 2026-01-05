@@ -45,6 +45,7 @@ models/
 logs/
 *.log
 *.csv
+*.json
 
 
 # Notebooks & Experiment Files
