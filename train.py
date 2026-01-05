@@ -4,6 +4,7 @@ import chromadb
 import math
 import numpy as np
 from keras import layers, models
+from archivist import run_archivist_on_b
 from src.data import load_dataset
 from src.model import build_model
 
@@ -14,6 +15,9 @@ DATASET_PATH = "./data/raw/Dungeon Crawl Stone Soup Full"
 MODEL_DIR = "models"
 VECTOR_DB_PATH = os.path.join(MODEL_DIR, "vector_db")
 MODEL_PATH = os.path.join(MODEL_DIR, "version_model.keras")
+SORTED_DIR = "data/restored_archive"
+REVIEW_DIR = "data/review_pile"
+DATASET_C = "data/dataset_c"
 
 # Training parameters (CPU-safe)
 BATCH_SIZE = 32
@@ -21,6 +25,8 @@ EPOCHS = 10
 VALIDATION_SPLIT = 0.2
 EMBEDDING_DIM = 64
 EMBEDDING_BATCH_SIZE = 512
+
+RUN_BOTH = True        # If True, runs training on both Dataset A and combined A+B
 
 # Training callbacks
 early_stop = tf.keras.callbacks.EarlyStopping(
@@ -41,12 +47,7 @@ def batch_iterable(iterable, batch_size):
         yield iterable[i:i + batch_size]
 
 # Main python function
-def main():
-
-    print("=== Dungeon Archivist (Phase 1 Training) ===")
-
-        # Load dataset
-    X, y, label_map, paths = load_dataset(DATASET_PATH)
+def train_on_dataset(X, y, label_map, collection_name):
     print(f"Loaded {X.shape[0]} images of shape {X.shape[1:]} with {len(label_map)} classes.")
 
     # Split dataset
@@ -77,7 +78,6 @@ def main():
 
     # Initialize ChromaDB collection
     client = chromadb.PersistentClient(path=VECTOR_DB_PATH)
-    collection_name = "dataset-A-embeddings"
     try:
         client.delete_collection(collection_name)
     except:
@@ -108,6 +108,65 @@ def main():
     print(f"All embeddings stored in ChromaDB collection '{collection_name}'.")
     print(f"Stored {total_stored} embeddings in ChromaDB")    
     print("Training Complete")
+
+def combine_datasets(datasets):
+    X_list, y_list = [], []
+    label_map_combined = {}
+    current_label_id = 0
+
+    for X, y, label_map in datasets:
+        # Map local labels to global labels
+        local_to_global = {}
+        for lbl_name, lbl_id in label_map.items():
+            if lbl_name not in label_map_combined:
+                label_map_combined[lbl_name] = current_label_id
+                local_to_global[lbl_id] = current_label_id
+                current_label_id += 1
+            else:
+                local_to_global[lbl_id] = label_map_combined[lbl_name]
+
+        # Remap y to global labels
+        y_global = np.array([local_to_global[i] for i in y], dtype=np.int32)
+
+        X_list.append(X)
+        y_list.append(y_global)
+
+    X_combined = np.concatenate(X_list, axis=0)
+    y_combined = np.concatenate(y_list, axis=0)
+
+    return X_combined, y_combined, label_map_combined
+
+
+def train_on_dataset_a():
+    print("=== Dungeon Archivist (Phase 1 Training) ===")
+    collection_name = "dataset-A-embeddings"
+
+    X, y, label_map, paths = load_dataset(DATASET_PATH)
+    train_on_dataset(X, y, label_map, collection_name)
+
+def train_on_datasets_ab():
+    train_on_dataset_a()    # Create initial model
+    run_archivist_on_b() # Run archivist to sort images into SORTED_DIR and REVIEW_DIR
+
+    print("=== Dungeon Archivist (Phase 3 Training: The \"Expansion\" Analysis) ===")
+    # Load all datasets
+    X1, y1, label_map1, _ = load_dataset(DATASET_PATH)
+    X2, y2, label_map2, _ = load_dataset(SORTED_DIR)
+    # X3, y3, label_map3, _ = load_dataset(REVIEW_DIR)  # uncategorized images
+
+    X_combined, y_combined, label_map_combined = combine_datasets([
+        (X1, y1, label_map1),
+        (X2, y2, label_map2),
+        # (X3, y3, label_map3)
+    ])
+    collection_name = "dataset-AB-embeddings"
+    train_on_dataset(X_combined, y_combined, label_map_combined, collection_name)
+
+def main():
+    if RUN_BOTH:
+        train_on_datasets_ab()
+    else:
+        train_on_dataset_a()
 
 if __name__ == "__main__":
     main()
